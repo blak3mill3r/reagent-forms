@@ -195,7 +195,7 @@
        body)))
 
 (defmethod init-field :typeahead
-  [[type {:keys [id data-source input-class list-class item-class highlight-class result-fn choice-fn clear-on-focus?]
+  [[type {:keys [id data-source input-class list-class item-class highlight-class result-fn choice-fn clear-on-focus? placeholder]
           :as attrs
           :or {result-fn identity
                choice-fn identity
@@ -210,7 +210,8 @@
                              (reset! typeahead-hidden? true))]
     (render-element attrs doc
                     [type
-                     [:input {:type        :text
+                     [:input {:placeholder placeholder
+                              :type        :text
                               :class       input-class
                               :value       (let [v (get id)]
                                              (if-not (iterable? v)
