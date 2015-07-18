@@ -195,72 +195,74 @@
        body)))
 
 (defmethod init-field :typeahead
-  [[type {:keys [id data-source input-class list-class item-class highlight-class result-fn choice-fn clear-on-focus? placeholder]
+  [[type {:keys [id data-source input-class list-class item-class highlight-class result-fn choice-fn clear-on-focus? blur-on-choice? placeholder]
           :as attrs
           :or {result-fn identity
                choice-fn identity
-               clear-on-focus? true}}] {:keys [doc get save!]}]
-  (let [typeahead-hidden? (atom true)
+               clear-on-focus? true
+               blur-on-choice? true}}] {:keys [doc get save!]}]
+  (let [input-dom-el (atom nil)
+        typeahead-hidden? (atom true)
         mouse-on-list? (atom false)
         selected-index (atom 0)
         selections (atom [])
         choose-selected #(do (let [choice (nth @selections @selected-index)]
                                (save! id choice)
                                (choice-fn choice))
-                             (reset! typeahead-hidden? true))]
-    (render-element attrs doc
-                    [type
-                     [:input {:placeholder placeholder
-                              :type        :text
-                              :class       input-class
-                              :value       (let [v (get id)]
-                                             (if-not (iterable? v)
-                                               v (first v)))
-                              :on-focus    #(when clear-on-focus? (save! id ""))
-                              :on-blur     #(when-not @mouse-on-list?
-                                              (reset! typeahead-hidden? true)
-                                              (reset! selected-index 0))
-                              :on-change   #(do
-                                              (reset! selections (data-source (.toLowerCase (value-of %))))
-                                              (save! id (value-of %))
-                                              (reset! typeahead-hidden? false)
-                                              (reset! selected-index 0))
-                              :on-key-down #(do
-                                              (case (.-which %)
-                                                38 (do
-                                                     (.preventDefault %)
-                                                     (if-not (= @selected-index 0)
-                                                       (reset! selected-index (- @selected-index 1))))
-                                                40 (do
-                                                     (.preventDefault %)
-                                                     (if-not (= @selected-index (- (count @selections) 1))
-                                                       (reset! selected-index (+ @selected-index 1))))
-                                                9  (choose-selected)
-                                                13 (choose-selected)
-                                                27 (do (reset! typeahead-hidden? true)
-                                                       (reset! selected-index 0))
-                                                "default"))}]
+                             (reset! typeahead-hidden? true)
+                             (when blur-on-choice? (.blur @input-dom-el)))]
+    (with-meta (render-element attrs doc
+                               [type
+                                [:input {:placeholder placeholder
+                                         :type        :text
+                                         :class       input-class
+                                         :value       (let [v (get id)]
+                                                        (if-not (iterable? v)
+                                                          v (first v)))
+                                         :on-focus    #(when clear-on-focus? (save! id ""))
+                                         :on-blur     #(when-not @mouse-on-list?
+                                                         (reset! typeahead-hidden? true)
+                                                         (reset! selected-index 0))
+                                         :on-change   #(do
+                                                         (reset! selections (data-source (.toLowerCase (value-of %))))
+                                                         (save! id (value-of %))
+                                                         (reset! typeahead-hidden? false)
+                                                         (reset! selected-index 0))
+                                         :on-key-down #(do
+                                                         (case (.-which %)
+                                                           38 (do
+                                                                (.preventDefault %)
+                                                                (if-not (= @selected-index 0)
+                                                                  (reset! selected-index (- @selected-index 1))))
+                                                           40 (do
+                                                                (.preventDefault %)
+                                                                (if-not (= @selected-index (- (count @selections) 1))
+                                                                  (reset! selected-index (+ @selected-index 1))))
+                                                           9  (choose-selected)
+                                                           13 (choose-selected)
+                                                           27 (do (reset! typeahead-hidden? true)
+                                                                  (reset! selected-index 0))
+                                                           "default"))}]
 
-                     [:ul {:style {:display (if (or (empty? @selections) @typeahead-hidden?) :none :block) }
-                           :class list-class
-                           :on-mouse-enter #(reset! mouse-on-list? true)
-                           :on-mouse-leave #(reset! mouse-on-list? false)}
-                      (doall
-                       (map-indexed
-                        (fn [index result]
-                          [:li {:tab-index     index
-                                :key           index
-                                :class         (if (= @selected-index index) highlight-class  item-class)
-                                :on-mouse-over #(do
-                                                  (reset! selected-index (js/parseInt (.getAttribute (.-target %) "tabIndex"))))
-                                :on-click      #(do
-                                                  (reset! typeahead-hidden? true)
-                                                  (save! id result)
-                                                  (choice-fn result))}
-                           (result-fn result)])
-                        @selections))]])))
-
-
+                                [:ul {:style {:display (if (or (empty? @selections) @typeahead-hidden?) :none :block) }
+                                      :class list-class
+                                      :on-mouse-enter #(reset! mouse-on-list? true)
+                                      :on-mouse-leave #(reset! mouse-on-list? false)}
+                                 (doall
+                                  (map-indexed
+                                   (fn [index result]
+                                     [:li {:tab-index     index
+                                           :key           index
+                                           :class         (if (= @selected-index index) highlight-class  item-class)
+                                           :on-mouse-over #(do
+                                                             (reset! selected-index (js/parseInt (.getAttribute (.-target %) "tabIndex"))))
+                                           :on-click      #(do
+                                                             (reset! typeahead-hidden? true)
+                                                             (save! id result)
+                                                             (choice-fn result))}
+                                      [result-fn result]])
+                                   @selections))]])
+      {:component-did-update #(reset! input-dom-el (-> % reagent/dom-node (.querySelector  "input")))})))
 
 (defn- group-item [[type {:keys [key touch-event] :as attrs} & body] {:keys [save! multi-select]} selections field id]
   (letfn [(handle-click! []
