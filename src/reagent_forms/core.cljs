@@ -195,13 +195,16 @@
        body)))
 
 (defmethod init-field :typeahead
-  [[type {:keys [id data-source input-class list-class item-class highlight-class result-fn choice-fn clear-on-focus? blur-on-choice? placeholder]
+  [[type {:keys [id data-source input-class list-class item-class highlight-class result-fn choice-fn clear-on-focus? blur-on-choice? placeholder grab-focus?]
           :as attrs
           :or {result-fn identity
                choice-fn identity
                clear-on-focus? true
                blur-on-choice? true}}] {:keys [doc get save!]}]
   (let [input-dom-el (atom nil)
+        grab-input-dom-el (fn [ev]
+                            (reset! input-dom-el (-> ev reagent/dom-node (.querySelector  "input")))
+                            (if grab-focus? (.focus @input-dom-el)))
         typeahead-hidden? (atom true)
         mouse-on-list? (atom false)
         selected-index (atom 0)
@@ -262,7 +265,8 @@
                                                              (choice-fn result))}
                                       [result-fn result]])
                                    @selections))]])
-      {:component-did-update #(reset! input-dom-el (-> % reagent/dom-node (.querySelector  "input")))})))
+      {:component-did-update grab-input-dom-el
+       :component-did-mount grab-input-dom-el})))
 
 (defn- group-item [[type {:keys [key touch-event] :as attrs} & body] {:keys [save! multi-select]} selections field id]
   (letfn [(handle-click! []
